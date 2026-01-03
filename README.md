@@ -1,7 +1,3 @@
-Here is a **small, clean README** with **Installation** and **Quick Start**, tailored to your Balatro + LLM AutoPlayer project.
-
----
-
 # AutoPlayer (a Balatro Mod)
 
 AutoPlayer is a Balatro mod that captures the current game state using Lovely Injector and Steamodded, sends it to a local(Ollama) or cloud(Gemini) LLM, and automatically plays or discards cards based on the model’s decision.
