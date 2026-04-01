@@ -43,7 +43,7 @@ USE_DECK = os.environ.get("BALATRO_BC_NO_DECK", "0") != "1"
 
 # ── Imports from the mod directory ─────────────────────────────────────────────
 sys.path.insert(0, str(SCRIPT_DIR))
-from encode import encode_state, INPUT_DIM
+from encode import encode_state
 from model  import load_model
 
 

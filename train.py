@@ -14,7 +14,6 @@ Outputs:
 import argparse
 import json
 import random
-import time
 from pathlib import Path
 
 import numpy as np
@@ -50,12 +49,14 @@ class BalatraDataset(Dataset):
         card_targets_full = np.zeros(MAX_HAND, dtype=np.float32)
         card_targets_np = encode_card_targets(card_set, hand_size)
         card_targets_full[:hand_size] = card_targets_np
+        # NOTE: card_set (Python set) is intentionally NOT returned here.
+        # PyTorch's collate_fn cannot batch Python sets. true_cards is derived
+        # inside compute_metrics directly from the raw entry via encode_labels.
         return (
             x,
             torch.tensor(action_label, dtype=torch.long),
             torch.from_numpy(card_targets_full),
             hand_size,
-            card_set,
         )
 
 
@@ -82,7 +83,7 @@ def compute_metrics(
     with torch.no_grad():
         sample_ptr = 0
         for batch in loader:
-            x, action_labels, card_targets, hand_sizes, card_sets = batch
+            x, action_labels, card_targets, hand_sizes = batch
             x = x.to(device)
             action_labels = action_labels.to(device)
 
@@ -93,9 +94,11 @@ def compute_metrics(
                 action_pred = int(pred_actions[i].item())
                 action_true = int(action_labels[i].item())
                 hand_size   = int(hand_sizes[i])
-                true_cards  = card_sets[i]
-                if isinstance(true_cards, torch.Tensor):
-                    true_cards = set(true_cards.tolist())
+
+                # Derive true card set from the raw entry (avoids collation issue)
+                global_idx = entry_indices[sample_ptr + i]
+                entry = entries[global_idx]
+                _, true_cards = encode_labels(entry)
 
                 # ── Model card prediction ──────────────────────────────────
                 masked = card_logits[i].clone()
@@ -112,8 +115,6 @@ def compute_metrics(
                 exact_match += int(action_pred == action_true and pred_cards == true_cards)
 
                 # ── Solver baseline ────────────────────────────────────────
-                global_idx = entry_indices[sample_ptr + i]
-                entry = entries[global_idx]
                 s_action_str, s_card_idxs = solver_decide(entry)
                 s_action = 0 if s_action_str == "play" else 1
                 s_cards  = set(idx for idx in s_card_idxs if idx >= 0)
@@ -203,6 +204,7 @@ def train(args):
     log = []
     best_val_jaccard = -1.0
     best_epoch = 0
+    best_metrics = None  # metrics from the epoch where model.pt was saved
 
     print(f"\n{'Epoch':>5}  {'Loss':>8}  {'ActAcc':>7}  {'Jaccard':>8}  {'ExactM':>7}  {'LR':>8}")
     print("-" * 62)
@@ -213,7 +215,7 @@ def train(args):
         n_batches = 0
 
         for batch in train_loader:
-            x, action_labels, card_targets, hand_sizes, _ = batch
+            x, action_labels, card_targets, hand_sizes = batch
             x             = x.to(device)
             action_labels = action_labels.to(device)
             card_targets  = card_targets.to(device)
@@ -278,6 +280,7 @@ def train(args):
         if m["card_jaccard"] > best_val_jaccard:
             best_val_jaccard = m["card_jaccard"]
             best_epoch = epoch
+            best_metrics = {"val": m, "solver": s}  # snapshot metrics at this epoch
             save_model(model, "model.pt", "model_config.json")
 
     print(f"\nBest val Jaccard: {best_val_jaccard:.4f} at epoch {best_epoch}")
@@ -287,13 +290,14 @@ def train(args):
         json.dump(log, f, indent=2)
     print("Training log → training_log.json")
 
-    # Final 3-way comparison table
-    final = log[-1]
-    print("\n── 3-Way Comparison (val set, final epoch) ──")
+    # Final 3-way comparison table — uses best checkpoint metrics (matches model.pt)
+    bm = best_metrics or log[-1]  # fallback to last epoch if somehow not set
+    bv, bs = bm["val"], bm["solver"]
+    print(f"\n── 3-Way Comparison (val set, best epoch={best_epoch}) ──")
     print(f"{'Method':<25} {'ActionAcc':>10} {'CardJaccard':>12} {'ExactMatch':>11}")
     print("-" * 62)
-    print(f"{'Solver Baseline':<25} {final['solver']['action_acc']:>10.3f} {final['solver']['card_jaccard']:>12.3f} {final['solver']['exact_match']:>11.3f}")
-    print(f"{'BC Model':<25} {final['val']['action_acc']:>10.3f} {final['val']['card_jaccard']:>12.3f} {final['val']['exact_match']:>11.3f}")
+    print(f"{'Solver Baseline':<25} {bs['action_acc']:>10.3f} {bs['card_jaccard']:>12.3f} {bs['exact_match']:>11.3f}")
+    print(f"{'BC Model':<25} {bv['action_acc']:>10.3f} {bv['card_jaccard']:>12.3f} {bv['exact_match']:>11.3f}")
 
 
 # ── CLI ────────────────────────────────────────────────────────────────────────

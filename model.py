@@ -118,7 +118,7 @@ def load_model(weights_path: str, config_path: str, device: str = "cpu") -> Bala
     with open(config_path) as f:
         cfg = json.load(f)
     model = BalatraBC(input_dim=cfg["input_dim"], max_hand=cfg["max_hand"])
-    model.load_state_dict(torch.load(weights_path, map_location=device))
+    model.load_state_dict(torch.load(weights_path, map_location=device, weights_only=True))
     model.to(device)
     model.eval()
     return model

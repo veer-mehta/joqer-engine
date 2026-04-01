@@ -1,4 +1,4 @@
-import json, os, ollama
+import json, os
 import google.genai as genai
 from dotenv import load_dotenv
 
