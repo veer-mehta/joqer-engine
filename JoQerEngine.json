@@ -1,0 +1,13 @@
+{
+	"id": "JoQerEngine",
+	"name": "JoQerEngine",
+	"display_name": "JoQer Engine",
+	"author": ["lasaniyasevmamra"],
+	"description": "Deep Q-Learning agent that autonomously plays Balatro.",
+	"prefix": "ap",
+	"main_file": "main.lua",
+	"priority": 0,
+	"badge_colour": "FFFFFF",
+	"badge_text_colour": "000000",
+	"version": "1.8.4"
+}

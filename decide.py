@@ -1,86 +1,180 @@
-import json, os
-import google.genai as genai
-from dotenv import load_dotenv
+import json
+import numpy as np
+import torch
+import itertools
+from os import path
 
-load_dotenv()
+from decision_engine.agent.dqn import DQN
+from decision_engine.logic.discard_strats import apply_strategy
+from decision_engine.logic.evaluator import evaluate_hand, HAND_SCORES, card_chips
+from decision_engine.utils.encoding import encode_state
 
-client = genai.Client(api_key=os.getenv("GEM_API_KEY"))
 
-with open("state.json", "r", encoding="utf-8") as f:
-    state = json.load(f)
+MOD_PATH = r"./Mods/JoQerEngine/"
+MODEL_PATH = path.join(MOD_PATH, "apdqn.pth")
+ROUND_STATE_PATH = path.join(MOD_PATH, "round_state.json")
+DECISION_PATH = path.join(MOD_PATH, "decision.json")
 
-hand_size = len(state.get("hand", []))
 
-prompt = f"""
-You are an expert Balatro player, a POKER-inspired roguelike deck-builder.
+SUIT_MAP = {"Spades": 0, "Hearts": 1, "Diamonds": 2, "Clubs": 3}
 
-Your task is to choose the BEST action for the current hand.
 
-Return ONLY valid JSON.
-DO NOT use markdown.
-DO NOT use ``` fences.
-DO NOT add any text outside JSON.
+def convert_rank(rank):
+	return 0 if rank == 14 else rank - 1
 
-The JSON MUST match EXACTLY this format:
 
-{{
-  "action": "play" | "discard",
-  "card_indexes": [i0, i1, i2, i3, i4],
-  "reasoning": "short explanation"
-}}
+def best_hand_indices(hand):
 
-Rules:
-- "card_indexes" MUST ALWAYS contain EXACTLY 5 integers
-- Valid indexes are 0-based and refer to state["hand"]
-- Valid range is 0 to {hand_size - 1} inclusive (hand has {hand_size} cards)
-- If fewer than 5 cards are selected, pad remaining slots with -1
-- NEVER invent indexes that do not exist
-- NEVER repeat an index
-- You MAY choose "discard" to exchange cards for better ones using state["unused_discards"]
-- If state["unused_discards"] is 0, you MUST play — do not discard
+	best_score = -1
+	best_indices = []
 
-Key state fields:
-- hand:             your current cards (0-indexed)
-- deck_remaining:   cards still in the draw pile
-- hands_left:       hands remaining this round (play these or lose)
-- unused_discards:  discards remaining (0 = cannot discard)
-- chips_required:   chips needed to beat the blind
-- chips_scored:     chips accumulated so far this round
-- poker_hands:      chip/mult/level for each hand type
+	for comb in itertools.combinations(range(len(hand)), 5):
 
-Examples:
-Play 3 cards (Three of a Kind):
-{{ "action": "play", "card_indexes": [0, 1, 2, -1, -1], "reasoning": "Three Aces form Three of a Kind" }}
-Discard 3 cards to chase a Flush:
-{{ "action": "discard", "card_indexes": [2, 5, 6, -1, -1], "reasoning": "Discard off-suit cards to draw toward Flush" }}
+		cards = [hand[i] for i in comb]
 
-Poker Hands (lowest to highest):
-- High Card, Pair, Two Pair, Three of a Kind
-- Straight, Flush, Full House, Four of a Kind
-- Straight Flush, Flush House, Five of a Kind, Flush Five
+		hand_type = evaluate_hand(cards)
+		base_chips, mult = HAND_SCORES[hand_type]
+		card_sum = sum(card_chips(r) for r, _ in cards)
 
-Key mechanics:
-- You may discard ANY number of cards (1-5) to draw new ones
-- Discarding preserves unselected cards in hand
-- Playing a weak hand early wastes a hand — consider discarding for higher EV
-- Higher-level hands scale better than raw chips
-- If chips_scored is already close to chips_required, play safe
+		score = mult * (base_chips + card_sum)
 
-STATE:
-{json.dumps(state, indent=2)}
-"""
+		if score > best_score:
 
-# response = ollama.chat(model='mistral', messages=[{"role":"user", "content":prompt}])
-# text = response["message"]["content"].strip()
+			best_score = score
+			best_indices = list(comb)
 
-response = client.models.generate_content(model="models/gemini-2.5-flash", contents=prompt)
-text = response.text.strip()
+	return best_indices
 
-try:
-    decision = json.loads(text)
-except:
-    decision = { "error": "invalid", "raw": text }
 
-with open("decision.json", "w", encoding="utf-8") as f:
-    json.dump(decision, f, indent=2)
-    print(decision)
+
+def get_discard_indices(old_hand, new_hand):
+
+	removed = []
+	used = [False] * len(new_hand)
+
+	for i, card in enumerate(old_hand):
+
+		found = False
+
+		for j, nc in enumerate(new_hand):
+
+			if not used[j] and nc == card:
+
+				used[j] = True
+				found = True
+				break
+
+		if not found:
+
+			removed.append(i)
+
+	return removed
+
+
+
+# ----------------------------
+# Load model 
+# ----------------------------
+model = DQN(70, 6)
+model.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"))
+model.eval()
+
+
+
+
+# ----------------------------
+# Load state
+# ----------------------------
+with open(ROUND_STATE_PATH, "r") as f:
+	state_json = json.load(f)
+
+
+
+# ----------------------------
+# Convert state
+# ----------------------------
+hand = []
+
+for card in state_json["hand"]:
+
+	hand.append((convert_rank(card["rank"]), SUIT_MAP[card["suit"]]))
+
+discards_remaining = state_json.get("unused_discards", 0)
+
+
+
+# ----------------------------
+# Force play if no discards
+# ----------------------------
+if discards_remaining == 0:
+
+	decision = {
+		"action": "play",
+		"card_indexes": best_hand_indices(hand)
+	}
+
+	with open(DECISION_PATH, "w") as f:
+		json.dump(decision, f)
+
+	exit()
+
+
+
+# ----------------------------
+# Encode state
+# ----------------------------
+state_vec = encode_state(hand, discards_remaining)
+state_tensor = torch.tensor(state_vec, dtype=torch.float32)
+
+
+
+# ----------------------------
+# Inference
+# ----------------------------
+with torch.no_grad():
+
+	q_values = model(state_tensor)
+	q_values_np = q_values.numpy()
+
+	action = int(np.argmax(q_values_np))
+
+	print("Q-values:", q_values_np)
+	print("Chosen action:", action)
+
+
+
+# ----------------------------
+# Safety: prevent invalid discard
+# ----------------------------
+if action != 0 and discards_remaining == 0:
+
+	action = 0
+
+
+
+# ----------------------------
+# Decision
+# ----------------------------
+decision = {
+	"action": "play" if action == 0 else "discard",
+	"card_indexes": []
+}
+
+
+
+if action != 0:
+
+	new_hand = apply_strategy(hand, action)
+
+	removed = get_discard_indices(hand, new_hand)
+
+	decision["card_indexes"] = removed
+
+
+
+# ----------------------------
+# Save
+# ----------------------------
+with open(DECISION_PATH, "w") as f:
+
+	json.dump(decision, f)
