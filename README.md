@@ -15,7 +15,7 @@
 
 ## Demo
 
-![JoQer Engine Demo](mod-demo.mp4)
+<video src="mod-demo.mp4" controls="controls" style="max-width: 100%;"></video>
 
 ---
 
