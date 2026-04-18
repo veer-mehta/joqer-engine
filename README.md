@@ -186,7 +186,7 @@ JoQerEngine/
 │
 └── decision_engine/
     ├── train.py                # Training loop (Double DQN + replay)
-    ├── main.py                 # Smoke tests
+    ├── test.py                 # Smoke tests
     ├── plots.py                # Visualization suite
     ├── agent/
     │   ├── dqn.py              # Network (2×128 hidden layers)
@@ -206,11 +206,3 @@ JoQerEngine/
 ## License
 
 Open source under the [MIT License](LICENSE).
-
----
-
-<div align="center">
-
-*Built with PyTorch and a love for Balatro*
-
-</div>

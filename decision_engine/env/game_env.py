@@ -16,45 +16,43 @@ class GameEnv:
         return self.get_state()
 
     def step(self, action):
-    
+
         done = False
         reward = -0.01
         score = 0
-    
+
         # Action 0 = play
         if action == 0:
-    
             done = True
-    
+
             if self.discards_remaining > 0:
                 reward = -0.03
             else:
                 score = best_hand(self.hand)
                 reward = score / 500.0
-    
+
             return self.get_state(), reward, done, score
-    
+
         # Discard action
         if self.discards_remaining > 0:
-    
             old_score = best_hand(self.hand)
-    
+
             self.hand = apply_strategy(self.hand, action)
             self.discards_remaining -= 1
-    
+
             new_score = best_hand(self.hand)
-    
+
             # Improvement reward (IMPORTANT)
             reward += (new_score - old_score) / 500.0
-    
+
         # Force play
         if self.discards_remaining == 0:
-    
             score = best_hand(self.hand)
             reward = score / 500.0
             done = True
-    
-        return self.get_state(), reward, done, score        
+
+        return self.get_state(), reward, done, score
+
     def get_state(self):
         return encode_state(self.hand, self.discards_remaining)
 

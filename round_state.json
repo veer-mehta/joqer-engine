@@ -1,7 +1,7 @@
 {
-  "hands_played":3,
+  "hands_played":0,
   "jokers":[],
-  "timestamp":"2026-04-18 13:25:45",
+  "timestamp":"2026-04-18 14:13:49",
   "poker_hands":{
     "Flush House":{
       "level":1,
@@ -24,7 +24,7 @@
     "Pair":{
       "level":1,
       "chips":10,
-      "times_played":3,
+      "times_played":0,
       "mult":2
     },
     "Four of a Kind":{
@@ -78,29 +78,29 @@
   },
   "unused_discards":0,
   "hand":[{
-      "suit":"Diamonds",
-      "rank":13
-    },{
-      "suit":"Hearts",
-      "rank":10
-    },{
-      "suit":"Diamonds",
-      "rank":8
-    },{
-      "suit":"Diamonds",
-      "rank":6
+      "suit":"Clubs",
+      "rank":14
     },{
       "suit":"Spades",
-      "rank":5
+      "rank":13
+    },{
+      "suit":"Clubs",
+      "rank":13
+    },{
+      "suit":"Clubs",
+      "rank":12
     },{
       "suit":"Hearts",
-      "rank":5
+      "rank":11
     },{
       "suit":"Clubs",
-      "rank":4
+      "rank":11
     },{
       "suit":"Clubs",
-      "rank":3
+      "rank":8
+    },{
+      "suit":"Clubs",
+      "rank":6
     }],
-  "hands_left":1
+  "hands_left":4
 }
