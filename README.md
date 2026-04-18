@@ -13,11 +13,11 @@
 
 ---
 
-## Demo
+<!-- ## Demo
 
 <video src="mod-demo-small.mp4" controls="controls" style="max-width: 100%;"></video>
 
----
+--- -->
 
 ## Overview
 
@@ -118,7 +118,7 @@ Training generates the following diagnostic plots via `plots.py`:
 | Avg Score (last 1K episodes) | — |
 | Peak Score | — |
 | Convergence Episode | ~5,000–8,000 |
-| Dominant Actions | Typically action 2 (pairs) or 3 (weak removal) |
+| Dominant Actions | Typically action 2 (discard non pairs) or 3 (discard weak cards) |
 
 **Observations:**
 
@@ -139,11 +139,12 @@ Training generates the following diagnostic plots via `plots.py`:
 
 ### Steps
 
-1. **Clone into Balatro's mod directory:**
+1. **Clone into Balatro's mod directory and Rename the folder:**
 
    ```bash
    cd "%APPDATA%/Balatro/Mods"
-   git clone https://github.com/yourusername/JoQerEngine.git
+   git clone https://github.com/yourusername/joqer-engine.git
+   Rename-Item -Path "joqer-engine" -NewName "JoQerEngine"
    ```
 
 2. **Install dependencies:**
