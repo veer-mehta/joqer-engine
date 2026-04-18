@@ -15,7 +15,7 @@
 
 ## Demo
 
-<video src="./mod-demo.mp4" controls width="640" height="400" autoplay loop muted></video>
+![JoQer Engine Demo](mod-demo.mp4)
 
 ---
 
