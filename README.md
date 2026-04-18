@@ -118,7 +118,7 @@ Training generates the following diagnostic plots via `plots.py`:
 | Avg Score (last 1K episodes) | — |
 | Peak Score | — |
 | Convergence Episode | ~5,000–8,000 |
-| Dominant Actions | Typically action 2 (pairs) or 3 (weak removal) |
+| Dominant Actions | Typically action 2 (discard non pairs) or 3 (discard weak cards) |
 
 **Observations:**
 
