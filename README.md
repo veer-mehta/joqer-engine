@@ -15,6 +15,7 @@
 
 ## Demo
 
+<video src="mod-demo-small.mp4" controls="controls" style="max-width: 100%;"></video>
 
 ---
 
