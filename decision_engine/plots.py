@@ -28,7 +28,7 @@ def plot_scores(total_scores):
 	plt.figure(figsize=(10, 6))
 	sns.histplot(total_scores, bins=40, kde=True)
 	plt.title("Score Distribution")
-	plt.xlabel("Score")
+	plt.xlabel("score")
 	plt.show()
 
 
