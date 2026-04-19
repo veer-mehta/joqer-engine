@@ -15,7 +15,7 @@
 
 ## Demo
 
-![Demo](mod-demo.gif)
+![Demo](media/mod-demo.gif)
 
 ---
 
@@ -61,7 +61,7 @@ flowchart LR
 | `1` | Flush Chase | Discard cards not matching the dominant suit |
 | `2` | Keep Pairs | Discard singleton ranks, keep duplicates |
 | `3` | Remove Weak | Discard low-rank cards without structural value |
-| `4` | Straight + Pairs | Keep sequential runs and paired ranks |
+| `4` | Keep Straight + Pairs | Keep sequential runs and paired ranks |
 | `5` | Composite Score | Discard lowest-scoring cards by composite metric |
 
 ### State Encoding (70-dim vector)
@@ -100,14 +100,24 @@ Input (70) → Linear(128) → ReLU → Linear(128) → ReLU → Linear(6)
 
 Training generates the following diagnostic plots via `plots.py`:
 
-| Plot | What it shows |
-|---|---|
-| Training Reward | Raw + smoothed (200-ep window) reward curve |
-| Score Distribution | Histogram with KDE of final hand scores |
-| Score Over Time | Box plots per 1K-episode chunk |
-| Action Distribution | Frequency of each strategy chosen |
-| Reward vs Score | Scatter plot with regression line |
-| Rolling Average Score | 200-episode rolling mean |
+<div align="center">
+
+| Training Reward | Score Distribution |
+|:---:|:---:|
+| ![Training Reward](media/Figure_1.png) | ![Score Distribution](media/Figure_2.png) |
+| *Raw + smoothed reward curve* | *Histogram of final hand scores* |
+
+| Score Over Time | Action Distribution |
+|:---:|:---:|
+| ![Score Over Time](media/Figure_3.png) | ![Action Distribution](media/Figure_4.png) |
+| *Box plots per 1K-episode chunk* | *Frequency of each strategy chosen* |
+
+| Reward vs Score | Rolling Average Score |
+|:---:|:---:|
+| ![Reward vs Score](media/Figure_5.png) | ![Rolling Average Score](media/Figure_6.png) |
+| *Scatter plot with regression line* | *200-episode rolling mean* |
+
+</div>
 
 ---
 
@@ -125,7 +135,7 @@ Training generates the following diagnostic plots via `plots.py`:
 - The agent learns to exhaust all discards before playing, maximizing hand improvement.
 - Pair-keeping and weak-card removal tend to dominate the learned policy.
 - Reward shaping (improvement-based for discards, score-based for final play) encourages incremental hand building.
-- Playing early with discards remaining is penalized (`-0.03`), teaching the agent patience.
+- Playing early with discards remaining is penalized (`-0.01`), teaching the agent patience.
 
 ---
 
@@ -202,8 +212,3 @@ JoQerEngine/
         └── encoding.py         # State → 70-dim vector encoder
 ```
 
----
-
-## License
-
-Open source under the [MIT License](LICENSE).
