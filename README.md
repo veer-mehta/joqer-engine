@@ -180,7 +180,7 @@ JoQerEngine/
 ├── dkjson.lua                  # JSON library for Lua
 ├── apdqn.pth                   # Trained model weights
 ├── JoQerEngine.json            # Mod metadata
-├── requirements.txt            # Conda environment export
+├── requirements.txt            # Pip environment export
 │
 ├── round_state.json            # [runtime] hand state  (Lua → Python)
 ├── decision.json               # [runtime] AI decision (Python → Lua)
