@@ -29,6 +29,9 @@ batch_size = 32
 total_scores = []
 total_rewards = []
 action_counts = [0] * num_actions
+max_reward = 0
+max_score = 0
+max_hand = {}
 
 gamma = 0.9
 epsilon = 1.0
@@ -95,13 +98,11 @@ for episode in range(episodes):
 
             # Loss
             loss = ((q_values - targets) ** 2).mean()
-
             optimizer.zero_grad()
             loss.backward()
 
             # Proper gradient clipping (correct placement)
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-
             optimizer.step()
 
         state = next_state
@@ -110,6 +111,12 @@ for episode in range(episodes):
 
     total_rewards.append(total_reward)
     total_scores.append(total_score)
+
+    if max_score < total_score:
+        max_score = max(max_score, total_score)
+        max_hand = env.get_state_dict()
+
+    max_reward = max(max_reward, total_reward)
 
     # Better target update (avoid episode 0 update)
     if episode % target_update_freq == 0 and episode != 0:
@@ -132,6 +139,9 @@ with torch.no_grad():
     action = torch.argmax(q_values).item()
 
 print("Most Chosen action:", action)
+print("Max Score:", max_score)
+print("Hand when Max Score:", max_hand)
+print("Max Reward:", max_reward)
 
 plot_rewards(total_rewards)
 plot_scores(total_scores)
@@ -139,6 +149,5 @@ plot_scores_over_time(total_scores)
 plot_action_distribution(action_counts)
 plot_reward_vs_score(total_rewards, total_scores)
 plot_rolling_score(total_scores)
-
 
 torch.save(model.state_dict(), "apdqn.pth")
