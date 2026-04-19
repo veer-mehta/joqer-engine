@@ -70,7 +70,6 @@ def check_flush(suit_count):
 def check_straight(ranks):
     unique = sorted(set(ranks))
 
-    # Handle normal straights
     for i in range(len(unique) - 4):
         if unique[i + 4] - unique[i] == 4:
             return True
@@ -131,7 +130,6 @@ def get_contributing_cards(comb, hand_type):
                 contributing.add(r)
 
     else:
-        # straight / flush → all contribute
         return set(ranks)
 
     return contributing
@@ -156,7 +154,7 @@ def best_hand(cards):
             if r in contributing:
                 card_sum += card_chips(r)
             else:
-                penalty += card_chips(r)  # penalize dead cards
+                penalty += card_chips(r)
         
         score = mult * (base_chips + card_sum) - penalty
         

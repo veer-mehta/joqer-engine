@@ -33,7 +33,7 @@ class GameEnv:
 
             return self.get_state(), reward, done, score
 
-        # Discard action
+        # Discard action 1-5
         if self.discards_remaining > 0:
             old_score = best_hand(self.hand)
 
@@ -43,7 +43,7 @@ class GameEnv:
             new_score = best_hand(self.hand)
             reward += (new_score - old_score) / 500.0
 
-        # Force play
+        # No Discard Left
         if self.discards_remaining == 0:
             score = best_hand(self.hand)
             reward = score / 500.0

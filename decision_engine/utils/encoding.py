@@ -21,7 +21,7 @@ def encode_state(hand, discards_remaining):
     for _, s in hand:
         suit_counts[s] += 1
 
-    # Combine everything
+	# add remaining discards at the end
     state = np.concatenate(
         [card_counts, rank_counts, suit_counts, np.array([discards_remaining])]
     )

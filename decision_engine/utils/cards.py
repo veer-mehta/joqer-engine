@@ -25,7 +25,5 @@ def get_suits(hand):
 	return [card[1] for card in hand]
 
 
-
-
 def print_hand(hand):
 	return " ".join([rank_str[r] + suit_str[s] for r, s in hand])

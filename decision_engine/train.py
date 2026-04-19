@@ -33,27 +33,26 @@ max_reward = 0
 max_score = 0
 max_hand = {}
 
-gamma = 0.9
+gamma = 0.9			# discount factor
 epsilon = 1.0
 epsilon_decay = 0.9998
 epsilon_min = 0.05
 episodes = 20000
 
 
-for episode in range(episodes):
-    state = env.reset()
-    state = torch.tensor(state, dtype=torch.float32)
+
+for episode in range(1,episodes+1):
+    state = torch.tensor(env.reset(), dtype=torch.float32)
 
     done = False
     total_reward = 0
     total_score = 0
 
     while not done:
-        # ε-greedy action
-        if random.random() < epsilon:
+        if random.random() < epsilon:		# explore
             action = random.randint(0, num_actions - 1)
         else:
-            with torch.no_grad():
+            with torch.no_grad():			# exploit
                 q_values = model(state)
                 action = torch.argmax(q_values).item()
 
@@ -65,10 +64,8 @@ for episode in range(episodes):
         total_reward += reward
         total_score += score
 
-        # Store transition
         buffer.push(state, action, reward, next_state, done)
 
-        # Train from replay buffer
         if len(buffer) >= batch_size:
             batch = buffer.sample(batch_size)
 
@@ -78,16 +75,11 @@ for episode in range(episodes):
             next_states = torch.stack([b[3] for b in batch])
             dones = torch.tensor([b[4] for b in batch], dtype=torch.float32)
 
-            # Current Q values
             q_values = model(states)
             q_values = q_values.gather(1, actions.unsqueeze(1)).squeeze()
 
-            # ===== DOUBLE DQN FIX =====
             with torch.no_grad():
-                # Action selection from main model
                 next_actions = model(next_states).argmax(1)
-
-                # Action evaluation from target model
                 next_q_values = target_model(next_states)
 
                 max_next_q = next_q_values.gather(
@@ -96,12 +88,9 @@ for episode in range(episodes):
 
             targets = rewards + gamma * max_next_q * (1 - dones)
 
-            # Loss
             loss = ((q_values - targets) ** 2).mean()
             optimizer.zero_grad()
             loss.backward()
-
-            # Proper gradient clipping (correct placement)
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
 
@@ -118,7 +107,6 @@ for episode in range(episodes):
 
     max_reward = max(max_reward, total_reward)
 
-    # Better target update (avoid episode 0 update)
     if episode % target_update_freq == 0 and episode != 0:
         target_model.load_state_dict(model.state_dict())
 
@@ -131,7 +119,6 @@ for episode in range(episodes):
         action_counts = [0] * num_actions
 
 
-# Test trained model
 state = env.reset()
 
 with torch.no_grad():

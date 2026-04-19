@@ -80,11 +80,9 @@ def discard_low_unstructured(hand):
 	for card in hand:
 		r, _ = card
 
-		# keep duplicates OR high cards
 		if rank_count[r] > 1 or r >= 9:
 			to_keep.append(card)
 
-	# fallback
 	if len(to_keep) < 2:
 		to_keep = sorted(hand, key=lambda x: x[0], reverse=True)[:2]
 
@@ -149,16 +147,15 @@ def discard_non_sequence_plus_pairs(hand):
 
 def discard_worst_cards(hand, num_keep=4):
 
-	# score cards by usefulness
 	rank_count = Counter([r for r, _ in hand])
 	suit_count = Counter([s for _, s in hand])
 
 	def score(card):
 		r, s = card
 		return (
-			r * 2 +              # high card importance
-			rank_count[r] * 5 +  # pairs strong
-			suit_count[s] * 2    # flush potential
+			r * 2 +              
+			rank_count[r] * 5 +  
+			suit_count[s] * 2    
 		)
 
 	sorted_hand = sorted(hand, key=score, reverse=True)
@@ -194,10 +191,7 @@ def draw_new_cards(current_hand, num_new):
 
 def apply_strategy(hand, action):
 
-	if action == 0:
-		return hand
-
-	elif action == 1:
+	if action == 1:
 		return discard_non_flush(hand)
 
 	elif action == 2:
@@ -213,5 +207,4 @@ def apply_strategy(hand, action):
 		return discard_worst_cards(hand)
 
 	else:
-		open("else.txt",'w').write("fflkjhdsafjkasdjfhkfhkasdkjhfsdjfs\n")
 		return hand
