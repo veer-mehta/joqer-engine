@@ -1,13 +1,5 @@
-import random
 from collections import Counter
-from decision_engine.utils.cards import print_hand, random_card
-
-def discard_low_cards(hand, num_discard=2):
-	sorted_hand = sorted(hand, key=lambda x: x[0])  # sort by rank
-	to_remove = sorted_hand[:num_discard]
-	
-	return remove_cards(hand, to_remove)
-
+from decision_engine.utils.cards import random_card
 
 def discard_non_flush(hand):
 	suits = [s for _, s in hand]
@@ -35,11 +27,6 @@ def discard_singletons(hand):
 	return draw_new_cards(to_keep, num_needed)
 
 
-def discard_random(hand, num_discard=2):
-	to_remove = random.sample(hand, num_discard)
-	return remove_cards(hand, to_remove)
-
-
 def discard_non_sequence(hand):
 	ranks = sorted(set([r for r, _ in hand]))
 	best_seq = []
@@ -56,7 +43,6 @@ def discard_non_sequence(hand):
 		if len(current_seq) > len(best_seq):
 			best_seq = current_seq
 
-	# Handle Ace-high straight (10-J-Q-K-A)
 	if set([9,10,11,12,0]).issubset(ranks):
 		if len(best_seq) < 5:
 			best_seq = [9,10,11,12,0]
@@ -166,19 +152,6 @@ def discard_worst_cards(hand, num_keep=4):
 	return draw_new_cards(to_keep, num_needed)
 
 
-def remove_cards(hand, to_remove):
-
-	new_hand = hand.copy()
-
-	for card in to_remove:
-		new_hand.remove(card)
-
-	for _ in range(len(to_remove)):
-		new_hand.append(random_card())
-
-	return new_hand
-
-
 def draw_new_cards(current_hand, num_new):
 
 	new_hand = current_hand.copy()
@@ -186,7 +159,6 @@ def draw_new_cards(current_hand, num_new):
 		new_hand.append(random_card())
 
 	return new_hand
-
 
 
 def apply_strategy(hand, action):

@@ -1,2 +1,5 @@
 round_state.json
 decision.json
+
+*/__pycache__
+*/*/__pycache__

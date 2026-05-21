@@ -1,10 +1,8 @@
 import random
-
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 import torch
-
 from decision_engine.agent.dqn import DQN
 from decision_engine.agent.replay_buffer import ReplayBuffer
 from decision_engine.env.game_env import GameEnv
@@ -35,9 +33,9 @@ max_hand = {}
 
 gamma = 0.9			# discount factor
 epsilon = 1.0
-epsilon_decay = 0.9998
+epsilon_decay = 0.9998  # 0.999
 epsilon_min = 0.05
-episodes = 20000
+episodes = 20000    # 5000
 
 
 
@@ -81,15 +79,11 @@ for episode in range(1,episodes+1):
             with torch.no_grad():
                 next_actions = model(next_states).argmax(1)
                 next_q_values = target_model(next_states)
-
-                max_next_q = next_q_values.gather(
-                    1, next_actions.unsqueeze(1)
-                ).squeeze()
+                max_next_q = next_q_values.gather(1, next_actions.unsqueeze(1)).squeeze()
 
             targets = rewards + gamma * max_next_q * (1 - dones)
-
             loss = ((q_values - targets) ** 2).mean()
-            optimizer.zero_grad()
+            optimizer.zero_grad() # reset grads
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
@@ -97,6 +91,7 @@ for episode in range(1,episodes+1):
         state = next_state
 
     epsilon = max(epsilon_min, epsilon * epsilon_decay)
+
 
     total_rewards.append(total_reward)
     total_scores.append(total_score)
@@ -116,7 +111,7 @@ for episode in range(1,episodes+1):
         print(
             f"Episode {episode}, Avg Reward: {avg_reward:.3f}, Epsilon: {epsilon:.3f}, Action distribution: {action_counts}, Avg Score: {avg_score:.3f}",
         )
-        action_counts = [0] * num_actions
+        if episode != episodes: action_counts = [0] * num_actions
 
 
 state = env.reset()

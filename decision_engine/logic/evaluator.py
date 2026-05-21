@@ -15,11 +15,10 @@ HAND_SCORES = {
 
 
 def card_chips(rank):
-    # 0 = Ace, 1 = 2, ..., 12 = King
     if rank == 0:
-        return 11  # Ace
+        return 11
     if rank >= 10:
-        return 10  # face cards
+        return 10
     return rank + 1
 
 
@@ -114,12 +113,12 @@ def get_contributing_cards(comb, hand_type):
             if count[r] == 2:
                 contributing.add(r)
 
-    elif hand_type == "three":
+    elif hand_type == "three_kind":
         for r in count:
             if count[r] == 3:
                 contributing.add(r)
 
-    elif hand_type == "four":
+    elif hand_type == "four_kind":
         for r in count:
             if count[r] == 4:
                 contributing.add(r)
@@ -133,9 +132,6 @@ def get_contributing_cards(comb, hand_type):
         return set(ranks)
 
     return contributing
-
-
-
 
 
 def best_hand(cards):

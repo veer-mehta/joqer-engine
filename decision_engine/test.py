@@ -7,13 +7,11 @@ import torch
 
 print(torch.cuda.is_available())
 
-##
 print("\ntest cards.py")
 hand = random_hand()
 print(print_hand(hand))
 
 
-##
 print("\ntest evaluator.py")
 
 hand = [
@@ -27,7 +25,6 @@ print(print_hand(hand))
 print("Score:", best_hand(hand))
 
 
-##
 print("\ntest discard_strats.py")
 hand = random_hand()
 print("Original:", print_hand(hand))
@@ -35,7 +32,6 @@ new_hand = apply_strategy(hand, 5)
 print("After discard:", print_hand(new_hand))
 
 
-##
 print("\ntest game_env.py")
 env = GameEnv()
 env.reset()
@@ -47,7 +43,7 @@ print("INIT HAND:", print_hand(state["hand"]))
 print("INITIAL DISCARDS LEFT:", state["discards"])
 
 while not done:
-	action = 0  # try different actions manually
+	action = 0
 	state, reward, done = env.step(action)
 	state = env.get_state_dict()
 	print("HAND:", print_hand(state["hand"]))
@@ -56,14 +52,12 @@ while not done:
 print("FINAL REWARD:", reward)
 
 
-##
 print("\ntest encoding.py")
 state = env.reset()
 print("State shape:", state.shape)
 print("State:", state)
 
 
-##
 
 print("\ntest dqn.py")
 

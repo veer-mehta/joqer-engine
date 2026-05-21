@@ -2,7 +2,7 @@ local curr_mod_path = "Mods/JoQerEngine/"
 local json = dofile(curr_mod_path .. "dkjson.lua")
 
 local select_timer = 0
-local sgu = Game.update
+local sgu = Game.update -- super fn
 
 local decision_thread = love.thread.newThread(curr_mod_path .. "decision_handler.lua")
 local ai_request = love.thread.getChannel("ai_request")
@@ -20,8 +20,6 @@ decision_thread:start()
 
 local function get_round_state()
     if not G or not G.GAME or not G.hand then return nil end
-
-    local cr = G.GAME.current_round  -- shorthand
 
     local state = {
         hands_played = G.GAME.hands_played,
@@ -110,7 +108,7 @@ function Game.update(self, dt)
     end
 
 
-    -- Step 1: apply delayed click
+    -- apply delayed click
     if pending_click then
         click_button = pending_click
         pending_click = nil
@@ -118,7 +116,7 @@ function Game.update(self, dt)
     end
 
 
-    -- Step 2: click button
+    -- click button
     if click_button then
         local id = click_button .. "_button"
 
@@ -136,7 +134,7 @@ function Game.update(self, dt)
     end
 
 
-    -- Step 3: receive decision
+    -- receive decision
     if decision_busy then
         local message = ai_response:pop()
 
@@ -163,14 +161,13 @@ function Game.update(self, dt)
     end
 
 
-    -- IMPORTANT FIX: don't block when we still need to click
     if G.hand and G.hand.highlighted and #G.hand.highlighted > 0 and not click_button and not pending_click then
         select_timer = 0
         return
     end
 
 
-    -- Step 4: trigger new decision
+    -- trigger new decision
     if select_timer > 0.125 then
         local state = get_round_state()
         if state then
