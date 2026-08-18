@@ -3,20 +3,27 @@ import torch.nn as nn
 
 
 class DQN(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super().__init__()
+        self.feature = nn.Sequential(
+            nn.Linear(input_dim, 256),
+            nn.ReLU(),
+            nn.Linear(256, 256),
+            nn.ReLU(),
+        )
+        self.value = nn.Sequential(
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, 1),
+        )
+        self.advantage = nn.Sequential(
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, output_dim),
+        )
 
-	def __init__(self, input_dim, output_dim):
-
-		super().__init__()
-
-		self.net = nn.Sequential(
-			nn.Linear(input_dim, 128),
-			nn.ReLU(),
-
-			nn.Linear(128, 128),
-			nn.ReLU(),
-
-			nn.Linear(128, output_dim)
-		)
-
-	def forward(self, x):
-		return self.net(x)
+    def forward(self, x):
+        features = self.feature(x)
+        value = self.value(features)
+        advantage = self.advantage(features)
+        return value + advantage - advantage.mean(dim=-1, keepdim=True)

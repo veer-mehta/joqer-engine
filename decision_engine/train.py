@@ -1,135 +1,112 @@
 import random
-import matplotlib.pyplot as plt
-import pandas as pd
-import seaborn as sns
 import torch
 from decision_engine.agent.dqn import DQN
 from decision_engine.agent.replay_buffer import ReplayBuffer
 from decision_engine.env.game_env import GameEnv
 from decision_engine.plots import *
 
-env = GameEnv(8, 4)
+STATE_DIM = 77
+NUM_ACTIONS = 6
+EPISODES = 50000
+BATCH_SIZE = 64
+BUFFER_SIZE = 50000
+GAMMA = 0.95
+LR = 3e-4
+EPSILON_START = 1.0
+EPSILON_MIN = 0.05
+EPSILON_DECAY = 0.99988
+TARGET_SYNC_EVERY = 100
+MAX_STEPS = 50
 
-input_dim = 70
-num_actions = 6
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-model = DQN(input_dim, num_actions)
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+env = GameEnv()
+buffer = ReplayBuffer(BUFFER_SIZE)
 
-target_model = DQN(input_dim, num_actions)
-target_model.load_state_dict(model.state_dict())
-target_model.eval()
-target_update_freq = 100
+policy_net = DQN(STATE_DIM, NUM_ACTIONS).to(device)
+target_net = DQN(STATE_DIM, NUM_ACTIONS).to(device)
+target_net.load_state_dict(policy_net.state_dict())
+target_net.eval()
 
-buffer = ReplayBuffer(10000)
-batch_size = 32
-
-total_scores = []
-total_rewards = []
-action_counts = [0] * num_actions
-max_reward = 0
-max_score = 0
-max_hand = {}
-
-gamma = 0.9			# discount factor
-epsilon = 1.0
-epsilon_decay = 0.9998  # 0.999
-epsilon_min = 0.05
-episodes = 20000    # 5000
+optimizer = torch.optim.Adam(policy_net.parameters(), lr=LR)
+epsilon = EPSILON_START
 
 
+def choose_action(state, epsilon):
+    if random.random() < epsilon:
+        return random.randint(0, NUM_ACTIONS - 1)
+    with torch.no_grad():
+        return policy_net(state.to(device)).argmax().item()
 
-for episode in range(1,episodes+1):
+
+def train_step():
+    if len(buffer) < BATCH_SIZE:
+        return
+
+    batch = buffer.sample(BATCH_SIZE)
+    states = torch.stack([b[0] for b in batch]).to(device)
+    actions = torch.tensor([b[1] for b in batch], dtype=torch.long).to(device)
+    rewards = torch.tensor([b[2] for b in batch], dtype=torch.float32).to(device)
+    next_states = torch.stack([b[3] for b in batch]).to(device)
+    dones = torch.tensor([b[4] for b in batch], dtype=torch.float32).to(device)
+
+    q_values = policy_net(states).gather(1, actions.unsqueeze(1)).squeeze()
+
+    with torch.no_grad():
+        best_actions = policy_net(next_states).argmax(1)
+        next_q = target_net(next_states).gather(1, best_actions.unsqueeze(1)).squeeze()
+
+    targets = rewards + GAMMA * next_q * (1 - dones)
+    loss = torch.nn.functional.smooth_l1_loss(q_values, targets)
+
+    optimizer.zero_grad()
+    loss.backward()
+    torch.nn.utils.clip_grad_norm_(policy_net.parameters(), 1.0)
+    optimizer.step()
+
+
+scores = []
+rewards_log = []
+win_history = []
+
+for ep in range(1, EPISODES + 1):
     state = torch.tensor(env.reset(), dtype=torch.float32)
+    ep_reward = 0
+    ep_score = 0
 
-    done = False
-    total_reward = 0
-    total_score = 0
-
-    while not done:
-        if random.random() < epsilon:		# explore
-            action = random.randint(0, num_actions - 1)
-        else:
-            with torch.no_grad():			# exploit
-                q_values = model(state)
-                action = torch.argmax(q_values).item()
-
-        action_counts[action] += 1
-
+    for step in range(MAX_STEPS):
+        action = choose_action(state, epsilon)
         next_state, reward, done, score = env.step(action)
         next_state = torch.tensor(next_state, dtype=torch.float32)
 
-        total_reward += reward
-        total_score += score
-
         buffer.push(state, action, reward, next_state, done)
+        train_step()
 
-        if len(buffer) >= batch_size:
-            batch = buffer.sample(batch_size)
-
-            states = torch.stack([b[0] for b in batch])
-            actions = torch.tensor([b[1] for b in batch], dtype=torch.long)
-            rewards = torch.tensor([b[2] for b in batch], dtype=torch.float32)
-            next_states = torch.stack([b[3] for b in batch])
-            dones = torch.tensor([b[4] for b in batch], dtype=torch.float32)
-
-            q_values = model(states)
-            q_values = q_values.gather(1, actions.unsqueeze(1)).squeeze()
-
-            with torch.no_grad():
-                next_actions = model(next_states).argmax(1)
-                next_q_values = target_model(next_states)
-                max_next_q = next_q_values.gather(1, next_actions.unsqueeze(1)).squeeze()
-
-            targets = rewards + gamma * max_next_q * (1 - dones)
-            loss = ((q_values - targets) ** 2).mean()
-            optimizer.zero_grad() # reset grads
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            optimizer.step()
-
+        ep_reward += reward
+        ep_score += score
         state = next_state
 
-    epsilon = max(epsilon_min, epsilon * epsilon_decay)
+        if done:
+            break
 
+    epsilon = max(EPSILON_MIN, epsilon * EPSILON_DECAY)
 
-    total_rewards.append(total_reward)
-    total_scores.append(total_score)
+    win_history.append(1 if env.game_won else 0)
+    scores.append(ep_score)
+    rewards_log.append(ep_reward)
 
-    if max_score < total_score:
-        max_score = max(max_score, total_score)
-        max_hand = env.get_state_dict()
+    if ep % TARGET_SYNC_EVERY == 0:
+        target_net.load_state_dict(policy_net.state_dict())
 
-    max_reward = max(max_reward, total_reward)
+    if ep % 500 == 0:
+        avg_r = sum(rewards_log[-500:]) / 500.0
+        avg_s = sum(scores[-500:]) / 500.0
+        recent_win_rate = (sum(win_history[-500:]) / 500.0) * 100.0
+        print(f"Ep {ep}/{EPISODES} | Reward: {avg_r:.2f} | Score: {avg_s:.0f} | WinRate(500): {recent_win_rate:.1f}% | e: {epsilon:.3f}")
 
-    if episode % target_update_freq == 0 and episode != 0:
-        target_model.load_state_dict(model.state_dict())
+torch.save(policy_net.state_dict(), "apdqn.pth")
 
-    if episode % 100 == 0:
-        avg_reward = sum(total_rewards[-100:]) / len(total_rewards[-100:])
-        avg_score = sum(total_scores[-100:]) / len(total_scores[-100:])
-        print(
-            f"Episode {episode}, Avg Reward: {avg_reward:.3f}, Epsilon: {epsilon:.3f}, Action distribution: {action_counts}, Avg Score: {avg_score:.3f}",
-        )
-        if episode != episodes: action_counts = [0] * num_actions
-
-
-state = env.reset()
-
-with torch.no_grad():
-    q_values = model(torch.tensor(state, dtype=torch.float32))
-    action = torch.argmax(q_values).item()
-
-print("Most Chosen action:", action)
-print("Max Score:", max_score)
-print("Hand when Max Score:", max_hand)
-print("Max Reward:", max_reward)
-
-plot_rewards(total_rewards)
-plot_scores(total_scores)
-plot_scores_over_time(total_scores)
-plot_action_distribution(action_counts)
-plot_reward_vs_score(total_rewards, total_scores)
-plot_rolling_score(total_scores)
-
-torch.save(model.state_dict(), "apdqn.pth")
+plot_rewards(rewards_log)
+plot_scores(scores)
+plot_scores_over_time(scores)
+plot_rolling_score(scores)

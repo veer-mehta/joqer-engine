@@ -2,7 +2,7 @@ local curr_mod_path = "Mods/JoQerEngine/"
 local json = dofile(curr_mod_path .. "dkjson.lua")
 
 local select_timer = 0
-local sgu = Game.update -- super fn
+local sgu = Game.update
 
 local decision_thread = love.thread.newThread(curr_mod_path .. "decision_handler.lua")
 local ai_request = love.thread.getChannel("ai_request")
@@ -25,12 +25,13 @@ local function get_round_state()
         hands_played = G.GAME.hands_played,
         hands_left = G.GAME.current_round.hands_left,
         unused_discards = G.GAME.current_round.discards_left,
+        chips = G.GAME.current_round and G.GAME.current_round.chips or 0,
+        blind_chips = G.GAME.blind and G.GAME.blind.chips or 1,
         poker_hands = {},
         hand = {},
         jokers = {},
         timestamp = os.date("%Y-%m-%d %H:%M:%S")
     }
-
 
     if G.GAME.hands then
         for name, hand in pairs(G.GAME.hands) do
@@ -81,7 +82,6 @@ end
 local function select_cards(decision)
     disselect_cards()
 
-    -- Select cards
     for _, idx in ipairs(decision.card_indexes or {}) do
         if idx >= 0 then
             local card = G.hand.cards[idx + 1]
@@ -91,7 +91,6 @@ local function select_cards(decision)
         end
     end
 
-    -- Delay click by 1 frame
     pending_click = decision.action
 end
 
@@ -108,7 +107,6 @@ function Game.update(self, dt)
     end
 
 
-    -- apply delayed click
     if pending_click then
         click_button = pending_click
         pending_click = nil
@@ -116,7 +114,6 @@ function Game.update(self, dt)
     end
 
 
-    -- click button
     if click_button then
         local id = click_button .. "_button"
 
@@ -134,7 +131,6 @@ function Game.update(self, dt)
     end
 
 
-    -- receive decision
     if decision_busy then
         local message = ai_response:pop()
 
@@ -167,7 +163,6 @@ function Game.update(self, dt)
     end
 
 
-    -- trigger new decision
     if select_timer > 0.125 then
         local state = get_round_state()
         if state then

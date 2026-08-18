@@ -4,8 +4,8 @@ import torch
 import itertools
 from os import path
 from decision_engine.agent.dqn import DQN
-from decision_engine.logic.discard_strats import apply_strategy
-from decision_engine.logic.evaluator import evaluate_hand, HAND_SCORES, card_chips
+from decision_engine.logic.discard_strats import get_discard_indices
+from decision_engine.logic.evaluator import score_combination, best_hand
 from decision_engine.utils.encoding import encode_state
 
 MOD_PATH = "./Mods/JoQerEngine/"
@@ -14,84 +14,66 @@ ROUND_STATE_PATH = path.join(MOD_PATH, "round_state.json")
 DECISION_PATH = path.join(MOD_PATH, "decision.json")
 
 SUIT_MAP = {"Spades": 0, "Hearts": 1, "Diamonds": 2, "Clubs": 3}
+FULL_HAND_TYPES = {"straight", "flush", "straight_flush", "full_house"}
 
 
-def best_hand_indices(hand):
-	best_score = -1
-	best_indices = []
-	for comb in itertools.combinations(range(len(hand)), 5):
-		cards = [hand[i] for i in comb]
-		hand_type = evaluate_hand(cards)
-		base_chips, mult = HAND_SCORES[hand_type]
-		card_sum = sum(card_chips(r) for r, _ in cards)
-		score = mult * (base_chips + card_sum)
-		if score > best_score:
-			best_score = score
-			best_indices = list(comb)
-	return best_indices
+def find_best_play(hand):
+    best_score = -1
+    best_comb = None
+    best_type = "high_card"
 
-def get_discard_indices(old_hand, new_hand):
-	removed = []
-	used = [False] * len(new_hand)
-	for i, oc in enumerate(old_hand):
-		found = False
-		for j, nc in enumerate(new_hand):
-			if not used[j] and nc == oc:
-				used[j] = True
-				found = True
-				break
-		if not found:
-			removed.append(i)
-	return removed
+    for comb in itertools.combinations(range(len(hand)), 5):
+        cards = [hand[i] for i in comb]
+        hand_type, score, _ = score_combination(cards)
 
-model = DQN(70, 6)
-model.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"))
+        if score > best_score:
+            best_score = score
+            best_comb = comb
+            best_type = hand_type
+
+    if best_type in FULL_HAND_TYPES:
+        return list(best_comb)
+
+    cards = [hand[i] for i in best_comb]
+    _, _, contributing = score_combination(cards)
+    return [i for i, (r, _) in zip(best_comb, cards) if r in contributing]
+
+
+model = DQN(77, 6)
+if path.exists(MODEL_PATH):
+    try:
+        model.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"))
+    except Exception as e:
+        print(f"Warning: Failed to load {MODEL_PATH} ({e}). Retrain using train.py.")
 model.eval()
 
-
 with open(ROUND_STATE_PATH, "r") as f:
-	state_json = json.load(f)
-
+    game_state = json.load(f)
 
 hand = []
-for card in state_json["hand"]:
-	hand.append((0 if card["rank"] == 14 else card["rank"] - 1, SUIT_MAP[card["suit"]]))
-discards_remaining = state_json.get("unused_discards", 0)
+for card in game_state["hand"]:
+    rank = 0 if card["rank"] == 14 else card["rank"] - 1
+    hand.append((rank, SUIT_MAP[card["suit"]]))
 
+discards_left = game_state.get("unused_discards", 0)
+hands_left = game_state.get("hands_left", 4)
+chips = game_state.get("chips", 0)
+blind_chips = game_state.get("blind_chips", 300)
+needed = max(0, blind_chips - chips)
+curr_score = best_hand(hand)
 
-if discards_remaining == 0:
-	decision = {
-		"action": "play",
-		"card_indexes": best_hand_indices(hand)
-	}
-	with open(DECISION_PATH, "w") as f:
-		json.dump(decision, f)
-	exit()
-
-
-state_vec = encode_state(hand, discards_remaining)
-state_tensor = torch.tensor(state_vec, dtype=torch.float32)
-
-
-with torch.no_grad():
-	q_values_np = model(state_tensor).numpy()
-	action = int(np.argmax(q_values_np))
-	print("Q-values:", q_values_np)
-	print("Chosen action:", action)
-
-
-decision = {
-	"action": "play" if action == 0 else "discard",
-	"card_indexes": []
-}
+if discards_left <= 0 or curr_score >= 150 or curr_score >= needed:
+    action = 0
+else:
+    state = torch.tensor(encode_state(hand, discards_left, hands_left, chips, blind_chips, curr_score), dtype=torch.float32)
+    with torch.no_grad():
+        q_values = model(state).numpy()
+    action = int(np.argmax(q_values))
 
 if action == 0:
-	decision["card_indexes"] = best_hand_indices(hand)
+    decision = {"action": "play", "card_indexes": find_best_play(hand)}
 else:
-	new_hand = apply_strategy(hand, action)
-	removed = get_discard_indices(hand, new_hand)
-	decision["card_indexes"] = removed
-
+    decision = {"action": "discard", "card_indexes": get_discard_indices(hand, action)}
 
 with open(DECISION_PATH, "w") as f:
-	json.dump(decision, f)
+    json.dump(decision, f)

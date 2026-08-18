@@ -1,5 +1,5 @@
 import itertools
-from collections import Counter, defaultdict
+from collections import Counter
 
 HAND_SCORES = {
     "straight_flush": (100, 8),
@@ -22,139 +22,68 @@ def card_chips(rank):
     return rank + 1
 
 
-def evaluate_hand(cards):
-
+def score_combination(cards):
     ranks = [c[0] for c in cards]
     suits = [c[1] for c in cards]
+    rank_counts = Counter(ranks)
+    counts = sorted(rank_counts.values(), reverse=True)
 
-    rank_count = Counter(ranks)
-    suit_count = Counter(suits)
-    counts = sorted(rank_count.values(), reverse=True)
+    is_flush = len(set(suits)) == 1
+    unique_ranks = sorted(set(ranks))
+    is_straight = False
+    if len(unique_ranks) == 5:
+        if unique_ranks[4] - unique_ranks[0] == 4 or unique_ranks == [0, 9, 10, 11, 12]:
+            is_straight = True
 
-    is_flush = check_flush(suit_count)
-    is_straight = check_straight(ranks)
-    is_straight_flush = check_straight_flush(cards)
-
-    if is_straight_flush:
-        return "straight_flush"
-
-    if counts[0] == 4:
-        return "four_kind"
-
-    if counts[0] == 3 and counts[1] >= 2:
-        return "full_house"
-
-    if is_flush:
-        return "flush"
-
-    if is_straight:
-        return "straight"
-
-    if counts[0] == 3:
-        return "three_kind"
-
-    if counts[0] == 2 and counts[1] == 2:
-        return "two_pair"
-
-    if counts[0] == 2:
-        return "pair"
-
-    return "high_card"
-
-
-def check_flush(suit_count):
-    return max(suit_count.values()) >= 5
-
-
-def check_straight(ranks):
-    unique = sorted(set(ranks))
-
-    for i in range(len(unique) - 4):
-        if unique[i + 4] - unique[i] == 4:
-            return True
-
-    # Ace-high (10-J-Q-K-A)
-    if set([9, 10, 11, 12, 0]).issubset(unique):
-        return True
-
-    return False
-
-
-def check_straight_flush(cards):
-
-    suit_groups = defaultdict(list)
-
-    for r, s in cards:
-        suit_groups[s].append(r)
-
-    for suit_cards in suit_groups.values():
-        if len(suit_cards) >= 5:
-            if check_straight(suit_cards):
-                return True
-
-    return False
-
-
-def get_contributing_cards(comb, hand_type):
-
-    ranks = [r for r, _ in comb]
-    from collections import Counter
-    count = Counter(ranks)
-
-    contributing = set()
-
-    if hand_type == "pair":
-        for r in count:
-            if count[r] == 2:
-                contributing.add(r)
-
-    elif hand_type == "two_pair":
-        for r in count:
-            if count[r] == 2:
-                contributing.add(r)
-
-    elif hand_type == "three_kind":
-        for r in count:
-            if count[r] == 3:
-                contributing.add(r)
-
-    elif hand_type == "four_kind":
-        for r in count:
-            if count[r] == 4:
-                contributing.add(r)
-
-    elif hand_type == "full_house":
-        for r in count:
-            if count[r] >= 2:
-                contributing.add(r)
-
+    if is_straight and is_flush:
+        hand_type = "straight_flush"
+        contributing = set(ranks)
+    elif counts[0] == 4:
+        hand_type = "four_kind"
+        contributing = {r for r, c in rank_counts.items() if c == 4}
+    elif counts[0] == 3 and counts[1] == 2:
+        hand_type = "full_house"
+        contributing = set(ranks)
+    elif is_flush:
+        hand_type = "flush"
+        contributing = set(ranks)
+    elif is_straight:
+        hand_type = "straight"
+        contributing = set(ranks)
+    elif counts[0] == 3:
+        hand_type = "three_kind"
+        contributing = {r for r, c in rank_counts.items() if c == 3}
+    elif counts[0] == 2 and counts[1] == 2:
+        hand_type = "two_pair"
+        contributing = {r for r, c in rank_counts.items() if c == 2}
+    elif counts[0] == 2:
+        hand_type = "pair"
+        contributing = {r for r, c in rank_counts.items() if c == 2}
     else:
-        return set(ranks)
+        hand_type = "high_card"
+        contributing = {max(ranks, key=card_chips)}
 
+    base_chips, mult = HAND_SCORES[hand_type]
+    card_chips_sum = sum(card_chips(r) for r, _ in cards if r in contributing)
+    score = mult * (base_chips + card_chips_sum)
+
+    return hand_type, score, contributing
+
+
+def evaluate_hand(cards):
+    hand_type, _, _ = score_combination(cards)
+    return hand_type
+
+
+def get_contributing_cards(cards, hand_type=None):
+    _, _, contributing = score_combination(cards)
     return contributing
 
 
 def best_hand(cards):
     best = 0
-
     for comb in itertools.combinations(cards, 5):
-        hand_type = evaluate_hand(comb)
-        base_chips, mult = HAND_SCORES[hand_type]
-        
-        contributing = get_contributing_cards(comb, hand_type)
-        
-        card_sum = 0
-        penalty = 0
-        
-        for r, _ in comb:
-            if r in contributing:
-                card_sum += card_chips(r)
-            else:
-                penalty += card_chips(r)
-        
-        score = mult * (base_chips + card_sum) - penalty
-        
+        _, score, _ = score_combination(comb)
         if score > best:
             best = score
-
     return best
